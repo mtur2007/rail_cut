@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2点で直線を作る</title>
+  <style>
+    :root {
+      --bg: #f4efe7;
+      --panel: #fffaf2;
+      --ink: #1e2430;
+      --accent: #cb5c38;
+      --accent-soft: #f3c7b5;
+      --grid: #dbcdbd;
+      --line: #2f5d62;
+      --point-a: #cb5c38;
+      --point-b: #4a7c59;
+      --preview-width: 240px;
+      --error-width: 280px;
+      --footer-safe-space: 320px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(203, 92, 56, 0.18), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(74, 124, 89, 0.16), transparent 30%),
+        linear-gradient(160deg, #f8f2ea 0%, var(--bg) 48%, #efe5d7 100%);
+      padding: 24px 24px var(--footer-safe-space);
+    }
+
+    .layout {
+      max-width: 1180px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 24px;
+    }
+
+    .layout.panel-hidden {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .panel,
+    .stage {
+      background: rgba(255, 250, 242, 0.88);
+      border: 1px solid rgba(30, 36, 48, 0.08);
+      border-radius: 24px;
+      box-shadow: 0 18px 48px rgba(72, 53, 36, 0.12);
+      backdrop-filter: blur(8px);
+    }
+
+    .panel {
+      padding: 24px;
+    }
+
+    .panel.hidden {
+      display: none;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      line-height: 1.1;
+      letter-spacing: 0.03em;
+    }
+
+    .lead {
+      margin: 0 0 24px;
+      line-height: 1.6;
+      color: rgba(30, 36, 48, 0.78);
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid rgba(30, 36, 48, 0.14);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font: inherit;
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    input:focus {
+      outline: 2px solid rgba(203, 92, 56, 0.25);
+      border-color: var(--accent);
+    }
+
+    .toggle-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 16px 0 8px;
+    }
+
+    .toggle-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid rgba(30, 36, 48, 0.12);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.78);
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .toggle-chip input {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      padding: 0;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin: 18px 0 24px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    #draw-btn {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    #reset-btn {
+      background: var(--accent-soft);
+      color: var(--ink);
+    }
+
+    .info {
+      display: grid;
+      gap: 10px;
+    }
+
+    .info-card {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(30, 36, 48, 0.08);
+    }
+
+    .info-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.88rem;
+      color: rgba(30, 36, 48, 0.66);
+    }
+
+    .stage {
+      padding: 18px;
+    }
+
+    .stage-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      margin: 0;
+      font-size: 0.95rem;
+      color: rgba(30, 36, 48, 0.78);
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(246, 239, 229, 0.95));
+    }
+
+    .stage-body {
+      display: grid;
+      gap: 18px;
+    }
+
+    .runner {
+      padding: 18px;
+      border-radius: 18px;
+      background: rgba(12, 18, 26, 0.92);
+      border: 1px solid rgba(115, 134, 158, 0.18);
+    }
+
+    .runner h2 {
+      margin: 0 0 8px;
+      font-size: 1.05rem;
+    }
+
+    .runner p {
+      margin: 0 0 14px;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      color: rgba(214, 226, 242, 0.72);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 180px;
+      resize: none;
+      overflow-x: auto;
+      overflow-y: auto;
+      border: 0;
+      border-radius: 0;
+      padding: 14px;
+      font: 14px/1.6 "SFMono-Regular", "Menlo", "Consolas", monospace;
+      background: transparent;
+      color: #d8e2f0;
+      white-space: pre;
+      word-break: normal;
+      overflow-wrap: normal;
+      tab-size: 2;
+      position: relative;
+      z-index: 1;
+      caret-color: #f7fbff;
+    }
+
+    textarea:focus {
+      outline: 2px solid rgba(31, 111, 235, 0.3);
+      border-color: #1f6feb;
+    }
+
+    .runner-actions {
+      display: flex;
+      gap: 10px;
+      margin: 12px 0;
+      flex-wrap: wrap;
+    }
+
+    .search-input {
+      min-width: 220px;
+      max-width: 320px;
+      border-radius: 8px;
+      border: 1px solid rgba(115, 134, 158, 0.32);
+      padding: 10px 12px;
+      font: 12px/1.2 "SFMono-Regular", "Menlo", "Consolas", monospace;
+      background: linear-gradient(180deg, #141b24 0%, #0f151d 100%);
+      color: #d7dfeb;
+    }
+
+    .search-input:focus {
+      outline: 2px solid rgba(31, 111, 235, 0.3);
+      border-color: #1f6feb;
+    }
+
+    .search-results {
+      min-width: 240px;
+      max-width: 360px;
+      border-radius: 8px;
+      border: 1px solid rgba(115, 134, 158, 0.32);
+      padding: 10px 12px;
+      font: 12px/1.2 "SFMono-Regular", "Menlo", "Consolas", monospace;
+      background: linear-gradient(180deg, #141b24 0%, #0f151d 100%);
+      color: #d7dfeb;
+    }
+
+    .search-results:focus {
+      outline: 2px solid rgba(31, 111, 235, 0.3);
+      border-color: #1f6feb;
+    }
+
+    .floating-runner-footer {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100vw;
+      margin: 0;
+      padding: 10px 12px 12px;
+      border-radius: 0;
+      background: rgba(15, 20, 28, 0.98);
+      border-top: 1px solid rgba(111, 128, 150, 0.28);
+      box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.32);
+      z-index: 20;
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 190px;
+      height: 240px;
+    }
+
+    .floating-runner-footer .runner-actions {
+      margin: 0;
+      padding: 0 2px;
+      align-items: center;
+      border-bottom: 1px solid rgba(111, 128, 150, 0.18);
+      padding-bottom: 10px;
+    }
+
+    .floating-runner-footer .runner-actions button {
+      border-radius: 8px;
+      border: 1px solid rgba(115, 134, 158, 0.32);
+      padding: 10px 14px;
+      font: 12px/1.2 "SFMono-Regular", "Menlo", "Consolas", monospace;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    #run-code-btn {
+      background: linear-gradient(180deg, #1f6feb 0%, #0f4fb8 100%);
+      color: #f7fbff;
+    }
+
+    #clear-code-btn {
+      background: linear-gradient(180deg, #2c3440 0%, #1b222d 100%);
+      color: #d7dfeb;
+    }
+
+    .resize-handle {
+      width: 100%;
+      height: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: ns-resize;
+      touch-action: none;
+    }
+
+    .resize-handle::before {
+      content: "";
+      width: 72px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(125, 145, 170, 0.52);
+    }
+
+    .code-editor {
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr);
+      align-items: start;
+      border: 1px solid rgba(115, 134, 158, 0.22);
+      border-radius: 16px;
+      background: #0b1118;
+      overflow: hidden;
+    }
+
+    .code-input-wrap {
+      position: relative;
+      min-width: 0;
+      overflow: hidden;
+      background: #0b1118;
+    }
+
+    .code-search-highlights {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .code-search-line {
+      position: absolute;
+      left: 0;
+      background: rgba(255, 221, 87, 0.12);
+      box-shadow: inset 0 0 0 1px rgba(255, 221, 87, 0.18);
+    }
+
+    .code-highlights {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .code-highlight-line {
+      position: absolute;
+      left: 0;
+      height: 2px;
+      background: rgba(86, 154, 248, 0.72);
+      box-shadow: none;
+    }
+
+    .line-numbers {
+      margin: 0;
+      padding: 14px 10px 14px 0;
+      background: #111923;
+      color: rgba(190, 203, 221, 0.42);
+      text-align: right;
+      font: 14px/1.6 "SFMono-Regular", "Menlo", "Consolas", monospace;
+      user-select: none;
+      overflow: hidden;
+      border-right: 1px solid rgba(115, 134, 158, 0.16);
+    }
+
+    .line-number {
+      display: block;
+      line-height: 1.6;
+    }
+
+    .line-number.function-line {
+      background: rgba(255, 232, 138, 0.26);
+      color: rgba(255, 236, 166, 0.96);
+      border-radius: 0;
+    }
+
+    .line-number.search-line {
+      background: rgba(255, 221, 87, 0.18);
+      color: rgba(255, 245, 188, 0.96);
+    }
+
+    .output-viewer {
+      display: grid;
+      grid-template-columns: var(--preview-width) 10px var(--error-width) 10px minmax(0, 1fr);
+      min-height: 0;
+      height: 100%;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #0b1118;
+      border: 1px solid rgba(115, 134, 158, 0.22);
+      flex: 1;
+    }
+
+    .output-preview {
+      position: relative;
+      background: #0f1722;
+      overflow: hidden;
+    }
+
+    .output-divider {
+      position: relative;
+      cursor: ew-resize;
+      background: #0d1420;
+      border-left: 1px solid rgba(115, 134, 158, 0.12);
+      border-right: 1px solid rgba(115, 134, 158, 0.12);
+      touch-action: none;
+    }
+
+    .output-divider::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 4px;
+      height: 56px;
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      background: rgba(125, 145, 170, 0.5);
+      box-shadow:
+        -6px 0 0 rgba(125, 145, 170, 0.18),
+        6px 0 0 rgba(125, 145, 170, 0.18);
+    }
+
+    .error-output-divider {
+      position: relative;
+      cursor: ew-resize;
+      background: #0d1420;
+      border-left: 1px solid rgba(115, 134, 158, 0.12);
+      border-right: 1px solid rgba(115, 134, 158, 0.12);
+      touch-action: none;
+    }
+
+    .error-output-divider::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 4px;
+      height: 56px;
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      background: rgba(125, 145, 170, 0.5);
+      box-shadow:
+        -6px 0 0 rgba(125, 145, 170, 0.18),
+        6px 0 0 rgba(125, 145, 170, 0.18);
+    }
+
+    .output-preview::after {
+      content: "Preview";
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(10, 14, 20, 0.78);
+      color: rgba(204, 216, 232, 0.82);
+      font: 11px/1.2 "SFMono-Regular", "Menlo", "Consolas", monospace;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      z-index: 1;
+    }
+
+    .output-preview svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 0;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(246, 239, 229, 0.95));
+    }
+
+    .output-error {
+      position: relative;
+      margin: 0;
+      min-height: 0;
+      height: 100%;
+      padding: 36px 14px 14px;
+      color: #f6b4ba;
+      font: 13px/1.6 "SFMono-Regular", "Menlo", "Consolas", monospace;
+      white-space: pre;
+      overflow: auto;
+      background: #121019;
+      border-right: 1px solid rgba(115, 134, 158, 0.16);
+    }
+
+    .output-error::before {
+      content: "Error";
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(75, 16, 25, 0.92);
+      color: #ffd9dd;
+      font: 11px/1.2 "SFMono-Regular", "Menlo", "Consolas", monospace;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .output-error mark,
+    .runner-output mark {
+      background: rgba(255, 221, 87, 0.92);
+      color: #1a1f27;
+      padding: 0;
+    }
+
+    .output-main {
+      min-width: 0;
+      min-height: 0;
+      display: block;
+      background: #0b1118;
+    }
+
+    .output-main-body {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .output-main-body::before {
+      content: "Console > Return";
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(18, 28, 42, 0.92);
+      color: rgba(214, 226, 242, 0.86);
+      font: 11px/1.2 "SFMono-Regular", "Menlo", "Consolas", monospace;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      z-index: 1;
+    }
+
+    .runner-output {
+      margin: 0;
+      min-height: 0;
+      height: 100%;
+      padding: 36px 14px 14px;
+      color: #d8e2f0;
+      font: 13px/1.6 "SFMono-Regular", "Menlo", "Consolas", monospace;
+      white-space: pre;
+      overflow: auto;
+      background: transparent;
+    }
+
+    .toggle-panel-btn {
+      background: rgba(255, 250, 242, 0.9);
+      color: var(--ink);
+      border: 1px solid rgba(30, 36, 48, 0.08);
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 700px) {
+      body {
+        padding: 16px 16px var(--footer-safe-space);
+      }
+
+      .floating-runner-footer {
+        width: 100vw;
+        margin: 0;
+        bottom: 0;
+      }
+
+      .output-viewer {
+        grid-template-columns: minmax(120px, var(--preview-width)) 10px minmax(140px, var(--error-width)) 10px minmax(0, 1fr);
+      }
+
+    }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <section class="panel" id="control-panel">
+      <h1>2点で直線を作る</h1>
+      <p class="lead">点A-B と点C-D の座標を入れると、右側に2本の直線を描画します。長さ、傾き、直線の式も自動で計算します。</p>
+
+      <div class="field-grid">
+        <label>
+          A の x
+          <input id="x1" type="number" step="any" value="40">
+        </label>
+        <label>
+          A の y
+          <input id="y1" type="number" step="any" value="60">
+        </label>
+        <label>
+          B の x
+          <input id="x2" type="number" step="any" value="220">
+        </label>
+        <label>
+          B の y
+          <input id="y2" type="number" step="any" value="180">
+        </label>
+        <label>
+          AB の太さ
+          <input id="width-ab" type="number" min="1" step="1" value="60">
+        </label>
+        <label>
+          C の x
+          <input id="x3" type="number" step="any" value="80">
+        </label>
+        <label>
+          C の y
+          <input id="y3" type="number" step="any" value="220">
+        </label>
+        <label>
+          D の x
+          <input id="x4" type="number" step="any" value="260">
+        </label>
+        <label>
+          D の y
+          <input id="y4" type="number" step="any" value="40">
+        </label>
+        <label>
+          CD の太さ
+          <input id="width-cd" type="number" min="1" step="1" value="60">
+        </label>
+      </div>
+
+      <div class="toggle-grid">
+        <label class="toggle-chip">
+          <input id="show-ab" type="checkbox" checked>
+          AB を表示
+        </label>
+        <label class="toggle-chip">
+          <input id="show-cd" type="checkbox" checked>
+          CD を表示
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="draw-btn" type="button">直線を描く</button>
+        <button id="reset-btn" type="button">初期値に戻す</button>
+      </div>
+
+      <div class="info">
+        <div class="info-card">
+          <strong>直線AB</strong>
+          <span id="line-ab-text">-</span>
+        </div>
+        <div class="info-card">
+          <strong>直線CD</strong>
+          <span id="line-cd-text">-</span>
+        </div>
+        <div class="info-card">
+          <strong>AB の長さ</strong>
+          <span id="length-ab-text">-</span>
+        </div>
+        <div class="info-card">
+          <strong>CD の長さ</strong>
+          <span id="length-cd-text">-</span>
+        </div>
+        <div class="info-card">
+          <strong>AB の傾き</strong>
+          <span id="slope-ab-text">-</span>
+        </div>
+        <div class="info-card">
+          <strong>AB の太さ</strong>
+          <span id="width-ab-text">-</span>
+        </div>
+        <div class="info-card">
+          <strong>CD の傾き</strong>
+          <span id="slope-cd-text">-</span>
+        </div>
+        <div class="info-card">
+          <strong>CD の太さ</strong>
+          <span id="width-cd-text">-</span>
+        </div>
+        <div class="info-card">
+          <strong>AB の式</strong>
+          <span id="equation-ab-text">-</span>
+        </div>
+        <div class="info-card">
+          <strong>CD の式</strong>
+          <span id="equation-cd-text">-</span>
+        </div>
+        <div class="info-card">
+          <strong>交点</strong>
+          <span id="intersection-text">-</span>
+        </div>
+        <div class="info-card">
+          <strong>交点の状態</strong>
+          <span id="intersection-state-text">-</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="stage-body">
+        <div class="stage-header">
+          <p class="status" id="status-text">2点を入力して直線を確認できます。</p>
+          <button class="toggle-panel-btn" id="toggle-panel-btn" type="button">panel を非表示</button>
+        </div>
+        <svg id="canvas" viewBox="0 0 720 520" aria-label="2点を結ぶ直線の表示"></svg>
+
+        <section class="runner">
+          <h2>コード実行</h2>
+          <p>`cut_line.js` の関数をその場で試せます。最後の式の値、または `return` の値を表示します。</p>
+          <div class="code-editor">
+            <pre class="line-numbers" id="line-numbers">1</pre>
+            <div class="code-input-wrap">
+              <div class="code-search-highlights" id="code-search-highlights"></div>
+              <div class="code-highlights" id="code-highlights"></div>
+              <textarea id="code-input" spellcheck="false">findCurrentIntersection()</textarea>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div class="floating-runner-footer">
+    <div class="resize-handle" id="runner-resize-handle" aria-label="出力欄の高さを調整"></div>
+    <div class="runner-actions">
+      <button id="run-code-btn" type="button">コードを実行</button>
+      <button id="clear-code-btn" type="button">結果を消す</button>
+      <input class="search-input" id="search-input" type="text" placeholder="検索してハイライト">
+      <select class="search-results" id="search-results">
+        <option value="">検索結果なし</option>
+      </select>
+    </div>
+    <div class="output-viewer">
+      <div class="output-preview">
+        <svg id="output-preview-canvas" viewBox="0 0 720 520" aria-label="描画プレビュー"></svg>
+      </div>
+      <div class="output-divider" id="output-divider" aria-label="プレビュー幅の調整"></div>
+      <pre class="output-error" id="code-error-output">[error]
+エラーはありません。</pre>
+      <div class="error-output-divider" id="error-output-divider" aria-label="エラー出力幅の調整"></div>
+      <div class="output-main">
+        <div class="output-main-body">
+          <pre class="runner-output" id="code-output">[return]
+ここに実行結果が表示されます。</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./cut_line.js"></script>
+  <script src="./line_builder.js"></script>
+</body>
+</html>
